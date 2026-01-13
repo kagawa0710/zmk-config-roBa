@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>roBa Keymap Visualizer</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    h1 {
+      text-align: center;
+      color: #00d9ff;
+      margin-bottom: 10px;
+    }
+    .info {
+      text-align: center;
+      color: #888;
+      margin-bottom: 20px;
+    }
+    .keyboard-container {
+      display: flex;
+      justify-content: center;
+      gap: 60px;
+      margin: 40px auto;
+    }
+    .keyboard {
+      position: relative;
+      width: 320px;
+      height: 280px;
+    }
+    .key {
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(145deg, #2d2d44, #1e1e30);
+      border: 2px solid #3d3d5c;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.1s ease;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    .key:hover {
+      border-color: #00d9ff;
+    }
+    .key.pressed {
+      background: linear-gradient(145deg, #00d9ff, #0099cc);
+      border-color: #00ffff;
+      color: #000;
+      transform: translateY(2px);
+      box-shadow: 0 2px 4px rgba(0,217,255,0.5);
+    }
+    .key .main {
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .key .mod {
+      font-size: 8px;
+      color: #888;
+      margin-top: 2px;
+    }
+    .key.pressed .mod {
+      color: #333;
+    }
+    .layer-indicator {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .layer-btn {
+      padding: 8px 16px;
+      background: #2d2d44;
+      border: 2px solid #3d3d5c;
+      border-radius: 4px;
+      color: #888;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .layer-btn:hover {
+      border-color: #00d9ff;
+    }
+    .layer-btn.active {
+      background: #00d9ff;
+      color: #000;
+      border-color: #00ffff;
+    }
+    .status {
+      text-align: center;
+      margin-top: 30px;
+      padding: 20px;
+      background: #2d2d44;
+      border-radius: 8px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .status h3 {
+      margin: 0 0 10px 0;
+      color: #00d9ff;
+    }
+    .last-key {
+      font-size: 24px;
+      font-weight: bold;
+      color: #fff;
+    }
+    .key-info {
+      margin-top: 10px;
+      color: #888;
+      font-size: 14px;
+    }
+    .instructions {
+      text-align: center;
+      color: #666;
+      font-size: 12px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>roBa Keymap Visualizer</h1>
+  <p class="info">キーを押すとハイライトされます</p>
+
+  <div class="layer-indicator">
+    <button class="layer-btn active" data-layer="0">Default</button>
+    <button class="layer-btn" data-layer="1">Mark (!@#)</button>
+    <button class="layer-btn" data-layer="2">NUM (123)</button>
+    <button class="layer-btn" data-layer="3">ARROW</button>
+    <button class="layer-btn" data-layer="4">MOUSE</button>
+    <button class="layer-btn" data-layer="5">SCROLL/Fn</button>
+    <button class="layer-btn" data-layer="6">BT/System</button>
+  </div>
+
+  <div class="keyboard-container">
+    <div class="keyboard" id="left-keyboard"></div>
+    <div class="keyboard" id="right-keyboard"></div>
+  </div>
+
+  <div class="status">
+    <h3>最後に押したキー</h3>
+    <div class="last-key" id="last-key">-</div>
+    <div class="key-info" id="key-info">キーボードをクリックするか、キーを押してください</div>
+  </div>
+
+  <p class="instructions">
+    ※ブラウザのkeydownイベントをキャプチャするため、一部のキー（Fn, レイヤー切り替え）は検出できません<br>
+    レイヤーボタンをクリックして各レイヤーのマッピングを確認できます
+  </p>
+
+  <script>
+    // Layout from roBa.json (positions in key units)
+    const layout = [
+      // Row 0 (top row)
+      { row: 0, col: 0, x: 0, y: 0.616, side: 'left' },
+      { row: 0, col: 1, x: 1.003, y: 0.247, side: 'left' },
+      { row: 0, col: 2, x: 2.005, y: 0, side: 'left' },
+      { row: 0, col: 3, x: 3.008, y: 0.132, side: 'left' },
+      { row: 0, col: 4, x: 4.011, y: 0.263, side: 'left' },
+      { row: 0, col: 9, x: 0, y: 0.264, side: 'right' },
+      { row: 0, col: 10, x: 1.002, y: 0.133, side: 'right' },
+      { row: 0, col: 11, x: 2.005, y: 0.001, side: 'right' },
+      { row: 0, col: 12, x: 3.008, y: 0.248, side: 'right' },
+      { row: 0, col: 13, x: 4.01, y: 0.617, side: 'right' },
+      // Row 1
+      { row: 1, col: 0, x: 0, y: 1.618, side: 'left' },
+      { row: 1, col: 1, x: 1.003, y: 1.25, side: 'left' },
+      { row: 1, col: 2, x: 2.005, y: 1.003, side: 'left' },
+      { row: 1, col: 3, x: 3.008, y: 1.134, side: 'left' },
+      { row: 1, col: 4, x: 4.011, y: 1.266, side: 'left' },
+      { row: 1, col: 5, x: 5.015, y: 1.504, side: 'left' },
+      { row: 1, col: 8, x: -0.504, y: 1.505, side: 'right' },
+      { row: 1, col: 9, x: 0, y: 1.267, side: 'right' },
+      { row: 1, col: 10, x: 1.002, y: 1.135, side: 'right' },
+      { row: 1, col: 11, x: 2.005, y: 1.004, side: 'right' },
+      { row: 1, col: 12, x: 3.008, y: 1.251, side: 'right' },
+      { row: 1, col: 13, x: 4.01, y: 1.619, side: 'right' },
+      // Row 2
+      { row: 2, col: 0, x: 0, y: 2.621, side: 'left' },
+      { row: 2, col: 1, x: 1.003, y: 2.253, side: 'left' },
+      { row: 2, col: 2, x: 2.005, y: 2.005, side: 'left' },
+      { row: 2, col: 3, x: 3.008, y: 2.137, side: 'left' },
+      { row: 2, col: 4, x: 4.011, y: 2.268, side: 'left' },
+      { row: 2, col: 5, x: 5.013, y: 2.507, side: 'left' },
+      { row: 2, col: 8, x: -0.504, y: 2.508, side: 'right' },
+      { row: 2, col: 9, x: 0, y: 2.269, side: 'right' },
+      { row: 2, col: 10, x: 1.002, y: 2.138, side: 'right' },
+      { row: 2, col: 11, x: 2.005, y: 2.006, side: 'right' },
+      { row: 2, col: 12, x: 3.008, y: 2.254, side: 'right' },
+      { row: 2, col: 13, x: 4.01, y: 2.622, side: 'right' },
+      // Row 3 (thumb cluster)
+      { row: 3, col: 0, x: 0, y: 3.624, side: 'left' },
+      { row: 3, col: 1, x: 1.003, y: 3.255, side: 'left' },
+      { row: 3, col: 2, x: 2.004, y: 3.007, side: 'left' },
+      { row: 3, col: 3, x: 3.219, y: 3.525, side: 'left' },
+      { row: 3, col: 4, x: 4.342, y: 3.617, side: 'left' },
+      { row: 3, col: 5, x: 5.451, y: 3.909, side: 'left' },
+      { row: 3, col: 8, x: -0.946, y: 3.91, side: 'right' },
+      { row: 3, col: 9, x: -0.346, y: 3.616, side: 'right' },
+      { row: 3, col: 13, x: 4.01, y: 3.625, side: 'right' },
+    ];
+
+    // Keymaps for each layer
+    const keymaps = {
+      0: [ // Default layer
+        'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P',
+        'A\nCtrl', 'S\nC-S', 'D', 'F\nL2', 'G', 'SS', '-\nL6', 'H', 'J\nAlt', 'K', 'L\nC-S', ';',
+        'Z\nShft', 'X', 'C', 'V', 'B', 'LClk', 'RClk', 'N\nL2', 'M\nL5', ',', '.', "'",
+        'Ctrl', 'Alt', 'Win', 'Tab\nL1', 'Spc\nL5', 'Shft', 'Ent\nL3', 'BS', 'L5'
+      ],
+      1: [ // Mark layer
+        '!', '@', '#', '$', '%', 'Ctrl', '&', '*', '(', ')',
+        '{', '}', '\\', '-', '=', '', '', "'", ';', '/', '[', ']',
+        '~', '`', '|', '_', '+', '', '', '"', ':', '<', '>', '?',
+        '', '', '', '', '', '', '', '', ''
+      ],
+      2: [ // NUM layer
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+        '-', '=', '`', '\\', '~', '', '', '[', ']', ';', "'", '/',
+        '_', '+', '~', '|', '', '', '', '{', '}', ':', '"', '?',
+        '', '', '', '', '', '', '', '', ''
+      ],
+      3: [ // ARROW layer
+        'Esc', 'C-S-Tab', '↑', 'C-Tab', '', '', '', '', '', '',
+        'Desk←', 'Win←', 'Win↑', 'Win→', 'Desk→', '', '', '', 'A-←', 'A-→', '', '',
+        'Shft', 'S-Win←', 'Win↓', 'S-Win→', '', '', '', '', 'MB4', 'MB5', '', '',
+        '', '', '', '', '', '', '', '', ''
+      ],
+      4: [ // MOUSE layer
+        '', '', '', '', '', '', '', '', '', '',
+        '', 'MB1', 'MB3', 'MB2', '', '', '', '', 'MB1', 'MB3', 'MB2', '',
+        '', '', '', '', '', '', '', '', '', '', '', '',
+        '', '', '', '', '', '', '', '', ''
+      ],
+      5: [ // SCROLL layer
+        'F11', 'F12', '', '', '', 'A-F4', 'W-`', '', '', '',
+        'F6', 'F7\nC-A', 'F8\nA-S', 'F9\nShft', 'F10', '', '', '←', '↓', '↑', '→', '',
+        'F1', 'F2', 'F3', 'F4', 'F5', '', '', 'Home', 'PgDn', 'PgUp', 'End', '',
+        '', '', '', 'A-S', 'A-C', 'Alt', 'A-C-S', 'Alt', ''
+      ],
+      6: [ // BT layer
+        '', '', '', '', '', 'BT0', 'BT1', 'BT2', 'BT3', 'BT4',
+        '', '', '', '', '', '', '', '', '', '', '', '',
+        '', '1', '2', '3', '', '', 'Boot', '', '', '', '', 'BT Clr',
+        '', '', '', '', '', '', '', '', 'Clr All'
+      ]
+    };
+
+    // Key index to keycode mapping (for pressed detection)
+    const keycodeToIndex = {
+      'KeyQ': 0, 'KeyW': 1, 'KeyE': 2, 'KeyR': 3, 'KeyT': 4,
+      'KeyY': 5, 'KeyU': 6, 'KeyI': 7, 'KeyO': 8, 'KeyP': 9,
+      'KeyA': 10, 'KeyS': 11, 'KeyD': 12, 'KeyF': 13, 'KeyG': 14,
+      'KeyH': 17, 'KeyJ': 18, 'KeyK': 19, 'KeyL': 20, 'Semicolon': 21,
+      'KeyZ': 22, 'KeyX': 23, 'KeyC': 24, 'KeyV': 25, 'KeyB': 26,
+      'KeyN': 29, 'KeyM': 30, 'Comma': 31, 'Period': 32, 'Quote': 33,
+      'ControlLeft': 34, 'AltLeft': 35, 'MetaLeft': 36, 'Tab': 37, 'Space': 38,
+      'ShiftLeft': 39, 'Enter': 40, 'Backspace': 41,
+      // Number row (for NUM layer)
+      'Digit1': 0, 'Digit2': 1, 'Digit3': 2, 'Digit4': 3, 'Digit5': 4,
+      'Digit6': 5, 'Digit7': 6, 'Digit8': 7, 'Digit9': 8, 'Digit0': 9,
+      // Function keys (for SCROLL layer)
+      'F1': 22, 'F2': 23, 'F3': 24, 'F4': 25, 'F5': 26,
+      'F6': 10, 'F7': 11, 'F8': 12, 'F9': 13, 'F10': 14,
+      'F11': 0, 'F12': 1,
+      // Arrow keys
+      'ArrowLeft': 17, 'ArrowDown': 18, 'ArrowUp': 19, 'ArrowRight': 20,
+      // Others
+      'Minus': 21, 'Equal': 11, 'BracketLeft': 17, 'BracketRight': 18,
+      'Backslash': 12, 'Slash': 21, 'Backquote': 12,
+      'Home': 29, 'End': 32, 'PageUp': 31, 'PageDown': 30,
+      'Escape': 0, 'Delete': 41,
+    };
+
+    let currentLayer = 0;
+    const keyElements = [];
+    const SCALE = 52; // pixels per key unit
+
+    function createKeyboard() {
+      const leftKb = document.getElementById('left-keyboard');
+      const rightKb = document.getElementById('right-keyboard');
+
+      layout.forEach((key, index) => {
+        const el = document.createElement('div');
+        el.className = 'key';
+        el.dataset.index = index;
+
+        const x = key.x * SCALE;
+        const y = key.y * SCALE;
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+
+        updateKeyLabel(el, index);
+
+        el.addEventListener('click', () => {
+          showKeyInfo(index);
+        });
+
+        if (key.side === 'left') {
+          leftKb.appendChild(el);
+        } else {
+          rightKb.appendChild(el);
+        }
+
+        keyElements.push(el);
+      });
+    }
+
+    function updateKeyLabel(el, index) {
+      const label = keymaps[currentLayer][index] || '';
+      const parts = label.split('\n');
+
+      el.innerHTML = '';
+      const mainSpan = document.createElement('span');
+      mainSpan.className = 'main';
+      mainSpan.textContent = parts[0] || '';
+      el.appendChild(mainSpan);
+
+      if (parts[1]) {
+        const modSpan = document.createElement('span');
+        modSpan.className = 'mod';
+        modSpan.textContent = parts[1];
+        el.appendChild(modSpan);
+      }
+    }
+
+    function updateAllKeys() {
+      keyElements.forEach((el, index) => {
+        updateKeyLabel(el, index);
+      });
+    }
+
+    function showKeyInfo(index) {
+      const label = keymaps[currentLayer][index] || '(none)';
+      document.getElementById('last-key').textContent = label.replace('\n', ' ');
+      document.getElementById('key-info').textContent =
+        `位置: ${index} | レイヤー: ${currentLayer} | キー: ${layout[index].row},${layout[index].col}`;
+    }
+
+    // Layer switching
+    document.querySelectorAll('.layer-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentLayer = parseInt(btn.dataset.layer);
+        updateAllKeys();
+      });
+    });
+
+    // Keyboard event handling
+    const pressedKeys = new Set();
+
+    document.addEventListener('keydown', (e) => {
+      e.preventDefault();
+
+      const code = e.code;
+      pressedKeys.add(code);
+
+      const index = keycodeToIndex[code];
+      if (index !== undefined && keyElements[index]) {
+        keyElements[index].classList.add('pressed');
+      }
+
+      const label = keymaps[currentLayer][index] || e.key;
+      document.getElementById('last-key').textContent = e.key;
+      document.getElementById('key-info').textContent =
+        `code: ${code} | key: ${e.key} | index: ${index ?? 'N/A'}`;
+    });
+
+    document.addEventListener('keyup', (e) => {
+      const code = e.code;
+      pressedKeys.delete(code);
+
+      const index = keycodeToIndex[code];
+      if (index !== undefined && keyElements[index]) {
+        keyElements[index].classList.remove('pressed');
+      }
+    });
+
+    // Initialize
+    createKeyboard();
+  </script>
+</body>
+</html>
